@@ -35,7 +35,7 @@ jobs:
       - id: check
         env:
           LZC_USER_TOKEN: ${{ secrets.LAZYCAT_TOKEN }}
-        run: node ci/review-gate.mjs cloud.lazycat.app.slskd
+        run: node ci/review-gate.mjs cloud.lazycat.app.zammad
   lazycat:
     needs: gate
     if: needs.gate.outputs.skip != 'true'
