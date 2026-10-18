@@ -26,7 +26,19 @@ permissions:
   pull-requests: write
 
 jobs:
+  gate:
+    runs-on: ubuntu-latest
+    outputs:
+      skip: ${{ steps.check.outputs.skip }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: check
+        env:
+          LZC_USER_TOKEN: ${{ secrets.LAZYCAT_TOKEN }}
+        run: node ci/review-gate.mjs cloud.lazycat.app.slskd
   lazycat:
+    needs: gate
+    if: needs.gate.outputs.skip != 'true'
     uses: ca-x/lazycat-github-action/.github/workflows/lazycat.yml@3dabca95f6eb0c3a6c4fc889631b13a055852912
     with:
       operation: ${{ inputs.operation || 'auto' }}
