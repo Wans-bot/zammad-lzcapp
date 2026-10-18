@@ -4,7 +4,7 @@ project:
   root: .
   build_config: lzc-build.yml
   package_file: package.yml
-  output: out/slskd.lpk
+  output: out/zammad.lpk
   target_arch: amd64
 
 update:
@@ -13,14 +13,15 @@ update:
   version_source:
     type: image
     image: app
+
 build:
   run_buildscript: false
 
 images:
   - id: app
     target: service
-    service: slskd
-    source: ghcr.io/slskd/slskd
+    service: zammad
+    source: zammad/zammad
     channel: stable
     tag_regex: '^v?\d+\.\d+\.\d+$'
     sort: semver
