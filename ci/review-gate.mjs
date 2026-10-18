@@ -28,7 +28,7 @@ function emit(skip, why) {
 const BLACKLIST = new Set([
   'alfio', 'azuracast', 'bambuddy1', 'ekko-studio',
   'ente', 'evcc1', 'flarum-forum', 'fuxa',
-  'glpi', 'hindsight', 'humhub', 'jimureport',
+  'hindsight', 'humhub', 'jimureport',
   'jitsi', 'kolibri', 'librenms', 'llamafactory',
   'loomio', 'mantisbt', 'meedu', 'mlflow',
   'moviepilot', 'nodebb', 'ocs-inventory', 'offen',
