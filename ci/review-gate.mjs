@@ -23,14 +23,22 @@ function emit(skip, why) {
 // ── 黑名单硬闸（最高优先级，不依赖 token）─────────────────────────
 // 权威来源：/lzcapp/document/智能体知识库/records/lpk-selection-preference-and-blacklist.md
 // 命中即拒绝提交官方商店。修改黑名单必须同步更新所有仓库的副本。
+// 权威来源：/lzcapp/document/智能体知识库/references/方法文档/06-选品方法.md §4 黑名单
+// 命中即拒绝提交官方商店。修改黑名单必须同步更新所有仓库的副本。
 const BLACKLIST = new Set([
-  'librenms', 'zabbix', 'wazuh', 'openmetadata', 'ragflow', 'mlflow',
-  'openproject-ce', 'taiga', 'jimureport', 'glpi', 'ocs-inventory', 'osticket',
-  'mantisbt', 'phpipam', 'opensourcepos', 'orangehrm', 'flarum-forum', 'nodebb',
-  'zulip', 'ente', 'romm-hub', 'azuracast', 'wizarr', 'kolibri', 'humhub', 'fuxa',
-  'relaydesk', 'tick-stock-panel', 'podfetch1', 'loomio', 'wavelog', 'offen',
-  'perler-beads', 'umap', 'llamafactory', 'poster-design', 'hindsight', 'picimpact',
-  'xzs', 'evcc1', 'bambuddy1',
+  'alfio', 'azuracast', 'bambuddy1', 'ekko-studio',
+  'ente', 'evcc1', 'flarum-forum', 'fuxa',
+  'glpi', 'hindsight', 'humhub', 'jimureport',
+  'jitsi', 'kolibri', 'librenms', 'llamafactory',
+  'loomio', 'mantisbt', 'meedu', 'mlflow',
+  'moviepilot', 'nodebb', 'ocs-inventory', 'offen',
+  'openbiliclaw', 'openmetadata', 'openproject-ce', 'opensourcepos',
+  'orangehrm', 'osticket', 'partdb1', 'perler-beads',
+  'phpipam', 'picimpact', 'podfetch1', 'poster-design',
+  'ragflow', 'relaydesk', 'romm-hub', 'slskd',
+  'taiga', 'tick-stock-panel', 'traccar', 'umap',
+  'wavelog', 'wazuh', 'wizarr', 'xzs',
+  'zabbix', 'zulip',
 ]);
 const shortId = String(pkg).replace(/^cloud\.lazycat\.apps?\./, '');
 if (BLACKLIST.has(shortId)) {
