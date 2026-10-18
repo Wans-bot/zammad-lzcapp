@@ -1,0 +1,37 @@
+name: LazyCat LPK
+
+# 自动更新：定时检查上游新版本 → 改版本号 → 打包 → 发 Release（可选提交商店）。
+# 也可手动 workflow_dispatch，或推 v* tag 走 publish。
+on:
+  push:
+    tags:
+      - "v*"
+
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: "auto / check / build / publish-official"
+        type: choice
+        options: [auto, check, build, publish-official]
+        default: auto
+      dry-run:
+        description: "只演练，不写文件、不发布"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  lazycat:
+    uses: ca-x/lazycat-github-action/.github/workflows/lazycat.yml@3dabca95f6eb0c3a6c4fc889631b13a055852912
+    with:
+      operation: ${{ inputs.operation || 'auto' }}
+      config: .github/lazycat-action.yml
+      dry-run: ${{ inputs.dry-run || false }}
+      versioned-release-asset: true
+    secrets:
+      LAZYCAT_TOKEN: ${{ secrets.LAZYCAT_TOKEN }}

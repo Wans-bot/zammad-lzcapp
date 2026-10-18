@@ -1,0 +1,34 @@
+version: 1
+
+project:
+  root: .
+  build_config: lzc-build.yml
+  package_file: package.yml
+  output: out/zammad.lpk
+  target_arch: amd64
+
+update:
+  strategy: publish
+  allow_downgrade: false
+  version_source:
+    type: image
+    image: app
+build:
+  run_buildscript: false
+
+images:
+  - id: app
+    target: service
+    service: zammad
+    source: ghcr.io/zammad/zammad
+    channel: custom
+    tag_regex: '^v?\d+\.\d+\.\d+$'
+    sort: semver
+    delivery:
+      mode: lazycat
+
+stores:
+  official:
+    enabled: false
+  private:
+    enabled: false

@@ -1,0 +1,301 @@
+application:
+  subdomain: zammad
+  # 【2026-10-14 返工 #20461】开多实例：每位微服用户各自一套实例与数据库（平台原生隔离），
+  # 实例内再用注入的「切换账号」控件切换应用账号（工单系统需要多同事协作）。
+  # 开 multi_instance 后，服务间地址必须用 compose 短名（下面的 FQDN 已全部替换）。
+  multi_instance: true
+  # 入口挂在 Zammad 自带 nginx 上（它同时负责 /ws 的 websocket 转发与静态资源）。
+  upstreams:
+    - location: /
+      backend: http://nginx:8080
+      disable_trim_location: true
+  health_check:
+    # init（迁移 + seeds + ES 索引）实测约 2 分钟，这里给 10 分钟启动等待，
+    # 未就绪期间 lzcinit 会停在就绪门，客户端显示「启动中」。
+    test_url: http://nginx:8080/
+    start_period: 600s
+    timeout: 10s
+  injects:
+    - id: lazycat-file-bridge
+      # 官方《网盘文件选择器/自动拦截》要求的 request 阶段桥接：
+      # /__lazycat_file_bridge/* 转发到 file.<boxdomain>，让「保存到网盘」真正落盘。
+      'on': request
+      auth_required: false
+      when:
+        - /__lazycat_file_bridge/*
+      do:
+        - src: >
+            const bridgePrefix = "/__lazycat_file_bridge";
+
+            const requestHost = String(ctx.request.host ||
+            "").split(":")[0].toLowerCase();
+
+            const firstDot = requestHost.indexOf(".");
+
+            const method = String(ctx.request.method || "").toUpperCase();
+
+            if (firstDot <= 0 || !requestHost.endsWith(".heiyu.space") ||
+            !["GET", "HEAD", "PUT"].includes(method)) {
+              ctx.response.send(["GET", "HEAD", "PUT"].includes(method) ? 400 : 405, "Invalid LazyCat file bridge request");
+              return;
+            }
+
+            const boxDomain = requestHost.slice(firstDot + 1);
+
+            ctx.headers.del("Origin");
+
+            ctx.headers.del("Referer");
+
+            ctx.proxy.to("https://file." + boxDomain, { path: "/files/home" +
+            ctx.request.path.slice(bridgePrefix.length), query:
+            ctx.request.raw_query, use_target_host: true, timeout_ms: 120000,
+            on_fail: "error" });
+    - id: open-save-chooser
+      # 官方选择器脚本（sha256 4da22e7d…，取自 developer.lazycat.cloud/lazycat-injects/）。
+      # Zammad 的上传入口（工单附件、客服回复附件）是 <input type=file> / 文件系统访问 API，
+      # 下载入口是 attachment 的同源 http 链接，分别由 fileInput 与 downloadAnchor 钩子接管。
+      # 【2026-10-13 返工】保持默认 auth_required=true：本应用页面不公开（匿名拿不到 HTML），
+      # 无票据上下文里官方脚本必然抛 invalid lzcapp api frontend api request
+      # （misago/defectdojo/tracearr/snapotter 同款教训）；已登录评审客户端照常执行。
+      'on': browser
+      when:
+        - /*
+      do:
+        - src: >-
+            file:///lzcapp/pkg/content/lazycat-injects/lzc-file-chooser-inject.js
+          params:
+            diskRoot: /_lzc/files/home
+            fileBridgeRoot: /__lazycat_file_bridge
+            fallbackMime: application/octet-stream
+            locale: auto
+            hooks:
+              fileSystemAccess: true
+              fileInput: true
+              downloadAnchor: true
+    - id: zammad-http-download-bridge
+      # 官方拦截器的 downloadAnchor 钩子只认 blob:/data: 锚点；Zammad 的附件下载
+      # 是带 download 属性的同源 http 链接（/api/v1/ticket_attachment/...），必须补接。
+      'on': browser
+      auth_required: false
+      when:
+        - /*
+      do:
+        - src: file:///lzcapp/pkg/content/lazycat-injects/zammad-http-download-bridge.js
+    - id: zammad-csp-allow-blob-download
+      # 官方网盘选择器在「保存下载」前会 fetch(blob:) 读取内容；Zammad 自带 CSP 的
+      # connect-src 只有 'self' ws: wss: https://images.zammad.com，会把该 fetch 拦掉
+      # （实测 console 报 "Connecting to 'blob:...' violates ... Content Security Policy"），
+      # 导致保存到网盘必定失败。这里只给 connect-src 追加 blob:，其余指令不动。
+      on: response
+      auth_required: false
+      when:
+        - /*
+      do: |
+        const csp = ctx.headers.get("Content-Security-Policy");
+        if (csp && /connect-src/i.test(csp) && !/connect-src[^;]*\bblob:/i.test(csp)) {
+          ctx.headers.set(
+            "Content-Security-Policy",
+            csp.replace(/connect-src([^;]*)/i, "connect-src$1 blob:"),
+          );
+        }
+    - id: zammad-login-autofill
+      # 免密 + 切换账号（驳回 #20461 修复）。脚本同时负责：
+      #   1) 登录页默认自动填充并提交（Zammad 是 SPA fetch 登录，必须点按钮，不能 form.submit）；
+      #   2) 应用内右下角「切换账号」：点了才真登出（走应用登出接口）并在本会话停用自动登录；
+      #   3) 停用状态下登录页出现「一键重新登录」，立即恢复自动登录（不用打字）。
+      'on': browser
+      auth_required: false
+      when:
+        - /*
+      do:
+        - src: file:///lzcapp/pkg/content/lazycat-injects/zammad-account-switch.js
+          params:
+            user: admin@example.com
+            password: LzcZammad2026!
+    - id: zammad-autowizard-fallback
+      # 兜底：正常路径下后端启动脚本已经调用过同一个官方接口完成初始化；
+      # 若用户恰好在初始化完成前打开 guided setup 页面，这里再调一次并刷新，
+      # 避免停在需要手填管理员表单的页面上。
+      'on': browser
+      auth_required: false
+      when:
+        - /#getting_started
+        - /#getting_started*
+      do: |
+        (function () {
+          try {
+            if (sessionStorage.getItem("lzc_zammad_wizard") === "1") return;
+            sessionStorage.setItem("lzc_zammad_wizard", "1");
+          } catch (e) {}
+          fetch("/api/v1/getting_started/auto_wizard", { credentials: "same-origin" })
+            .then(function (r) { return r.json().catch(function () { return null; }); })
+            .then(function (d) {
+              if (d && d.auto_wizard_success === true) {
+                setTimeout(function () { location.replace("/"); }, 1500);
+              }
+            })
+            .catch(function () {});
+        })();
+services:
+  postgres:
+    image: registry.lazycat.cloud/wans/library/postgres:b3b133402625495c
+    # 【2026-10-13 返工 #20237】为 elasticsearch 准备持久数据目录的 owner。
+    # 为什么放在这里：ES 镜像无 su/gosu/setpriv，无法在容器内自行降权；
+    # 而带 setup_script 的服务整体以 root 启动（镜像 User 被覆盖），ES 拒绝 root。
+    # postgres 本身以 root 跑（entrypoint 内部降权），加 setup_script 无副作用；
+    # ES 依赖 postgres healthy（其 setup_script 早已执行完）。
+    setup_script: |
+      #!/bin/sh
+      set -e
+      mkdir -p /lzcapp/var/es
+      chown -R 1000:0 /lzcapp/var/es
+    environment:
+      - POSTGRES_USER=zammad
+      - POSTGRES_PASSWORD=zammad_lzc_db_2026
+      - POSTGRES_DB=zammad_production
+      - TZ=Asia/Shanghai
+    binds:
+      - /lzcapp/var/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -q -U zammad -d zammad_production || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 120s
+  redis:
+    image: registry.lazycat.cloud/wans/library/redis:65c08547403d2862
+    environment:
+      - TZ=Asia/Shanghai
+    binds:
+      - /lzcapp/var/redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+  memcached:
+    image: registry.lazycat.cloud/wans/library/memcached:2cd2f8d95ab4623b
+    command: memcached -m 256M
+    environment:
+      - TZ=Asia/Shanghai
+    healthcheck:
+      test: ["CMD", "nc", "-z", "127.0.0.1", "11211"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+  elasticsearch:
+    image: registry.lazycat.cloud/wans/library/elasticsearch:ab0880f79b986875
+    # 【2026-10-13 返工 #20237】原用 run_as: 1000 映射持久目录 owner；但平台的
+    # run_as 走 idmapped 挂载，在「重装」场景会复现容器创建失败：
+    #   mkdir /lzcsys/run/pkgm/idmapped/.../zammad-var-1000-1000/storage:
+    #   value too large for defined data type   （exit status 1，应用起不来）
+    # 改为：不用 run_as；数据目录由 postgres 服务（见其 setup_script）以 root
+    # chown 给 elasticsearch(1000)，ES 通过 depends_on 等 postgres healthy 后再启动
+    # （spec：depends_on 强制检测 healthy）。ES 容器保持镜像默认 User=1000:0，
+    # 自行拒绝以 root 运行不受影响。
+    depends_on:
+      - postgres
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms1g -Xmx1g
+      - TZ=Asia/Shanghai
+    binds:
+      - /lzcapp/var/es:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:9200/_cluster/health >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 300s
+  zammad:
+    # 一个容器里跑 init → scheduler + websocket（后台）→ railsserver（前台），见 content/zammad/start-app.sh
+    image: registry.lazycat.cloud/wans/zammad/zammad:8bb7eb98f2854358
+    # 【2026-10-13 返工 #20237】原用 run_as: 1000（idmapped 映射），重装场景会
+    # 让容器创建失败（EOVERFLOW，见 elasticsearch 段注释）。改为 user: "0" 启动，
+    # start-app.sh 以 root 先 chown /lzcapp/var/storage 给 zammad(1000)，
+    # 再以 zammad 用户重入本脚本（等价于原 uid 1000 的运行语义）。
+    user: "0"
+    command: /bin/sh /lzcapp/pkg/content/zammad/start-app.sh
+    environment:
+      - TZ=Asia/Shanghai
+      - MEMCACHE_SERVERS=memcached:11211
+      - POSTGRESQL_DB=zammad_production
+      - POSTGRESQL_HOST=postgres
+      - POSTGRESQL_USER=zammad
+      - POSTGRESQL_PASS=zammad_lzc_db_2026
+      - POSTGRESQL_PORT=5432
+      - POSTGRESQL_DB_CREATE=true
+      - REDIS_URL=redis://redis:6379
+      - ELASTICSEARCH_ENABLED=true
+      - ELASTICSEARCH_SCHEMA=http
+      - ELASTICSEARCH_HOST=elasticsearch
+      - ELASTICSEARCH_PORT=9200
+      - ELASTICSEARCH_NAMESPACE=zammad
+      - ELASTICSEARCH_REINDEX=true
+      - ZAMMAD_FQDN=${LAZYCAT_APP_DOMAIN}
+      - ZAMMAD_HTTP_TYPE=https
+      - ZAMMAD_WEB_CONCURRENCY=2
+      - RAILS_TRUSTED_PROXIES=172.16.0.0/12
+      - ZAMMAD_RAILSSERVER_HOST=zammad
+      - ZAMMAD_RAILSSERVER_PORT=3000
+      - ZAMMAD_WEBSOCKET_HOST=zammad
+      - ZAMMAD_WEBSOCKET_PORT=6042
+      # 首启自动建号所需的值（由 content/zammad/start-app.sh 拼成 auto_wizard.json）：
+      # 建组织、建管理员、把默认语言设为简体中文。用户首次打开页面不需要输入账号密码。
+      - LZC_ADMIN_LOGIN=admin@example.com
+      - LZC_ADMIN_PASSWORD=LzcZammad2026!
+      - LZC_ADMIN_FIRSTNAME=管理员
+      - LZC_ADMIN_LASTNAME=账号
+      - LZC_ORG_NAME=我的团队
+      - LZC_PRODUCT_NAME=Zammad 工单系统
+      - LZC_LOCALE=zh-cn
+      # 必须作为环境变量导出：entrypoint 里的 ': "${AUTOWIZARD_RELATIVE_PATH:=tmp/auto_wizard.json}"'
+      # 只是 shell 变量，不会传给 rails 子进程，缺了它 AutoWizard 会去 /opt/zammad/auto_wizard.json 找。
+      - AUTOWIZARD_RELATIVE_PATH=tmp/auto_wizard.json
+    binds:
+      - /lzcapp/var/storage:/opt/zammad/storage
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:3000/ >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 600s
+  nginx:
+    image: registry.lazycat.cloud/wans/zammad/zammad:8bb7eb98f2854358
+    command: zammad-nginx
+    environment:
+      - TZ=Asia/Shanghai
+      - MEMCACHE_SERVERS=memcached:11211
+      - POSTGRESQL_DB=zammad_production
+      - POSTGRESQL_HOST=postgres
+      - POSTGRESQL_USER=zammad
+      - POSTGRESQL_PASS=zammad_lzc_db_2026
+      - POSTGRESQL_PORT=5432
+      - REDIS_URL=redis://redis:6379
+      - ELASTICSEARCH_ENABLED=true
+      - ELASTICSEARCH_SCHEMA=http
+      - ELASTICSEARCH_HOST=elasticsearch
+      - ELASTICSEARCH_PORT=9200
+      - ZAMMAD_FQDN=${LAZYCAT_APP_DOMAIN}
+      - ZAMMAD_HTTP_TYPE=https
+      - NGINX_PORT=8080
+      - NGINX_CLIENT_MAX_BODY_SIZE=512M
+      - NGINX_SERVER_NAME=_
+      # 关键：内层 nginx 转发给 rails 时必须声明 https。Zammad 的会话中间件
+      # （core_ext/rack/session/abstract/id.rb → Session.secure_flag?）只在「请求是 https」
+      # 时下发 session cookie；缺了它浏览器拿不到 _zammad_session_* cookie，
+      # 登录会一直报 CSRF token verification failed（实测踩到）。
+      - NGINX_SERVER_SCHEME=https
+      - ZAMMAD_RAILSSERVER_HOST=zammad
+      - ZAMMAD_RAILSSERVER_PORT=3000
+      - ZAMMAD_WEBSOCKET_HOST=zammad
+      - ZAMMAD_WEBSOCKET_PORT=6042
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS -o /dev/null http://127.0.0.1:8080/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 600s
