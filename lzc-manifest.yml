@@ -27,15 +27,14 @@ application:
         - src: >
             const bridgePrefix = "/__lazycat_file_bridge";
 
-            const requestHost = String(ctx.request.host ||
-            "").split(":")[0].toLowerCase();
+            const requestHost = String(ctx.request.host || "").split(":")[0].toLowerCase();
 
             const firstDot = requestHost.indexOf(".");
 
             const method = String(ctx.request.method || "").toUpperCase();
 
-            if (firstDot <= 0 || !requestHost.endsWith(".heiyu.space") ||
-            !["GET", "HEAD", "PUT"].includes(method)) {
+            if (firstDot <= 0 || !requestHost.endsWith(".heiyu.space") || !["GET", "HEAD", "PUT"].includes(method)) {
+
               ctx.response.send(["GET", "HEAD", "PUT"].includes(method) ? 400 : 405, "Invalid LazyCat file bridge request");
               return;
             }
@@ -46,10 +45,8 @@ application:
 
             ctx.headers.del("Referer");
 
-            ctx.proxy.to("https://file." + boxDomain, { path: "/files/home" +
-            ctx.request.path.slice(bridgePrefix.length), query:
-            ctx.request.raw_query, use_target_host: true, timeout_ms: 120000,
-            on_fail: "error" });
+            ctx.proxy.to("https://file." + boxDomain, { path: "/files/home" + ctx.request.path.slice(bridgePrefix.length), query: ctx.request.raw_query, use_target_host: true, timeout_ms: 120000, on_fail: "error" });
+
     - id: open-save-chooser
       # 官方选择器脚本（sha256 4da22e7d…，取自 developer.lazycat.cloud/lazycat-injects/）。
       # Zammad 的上传入口（工单附件、客服回复附件）是 <input type=file> / 文件系统访问 API，
@@ -212,7 +209,8 @@ services:
       start_period: 300s
   zammad:
     # 一个容器里跑 init → scheduler + websocket（后台）→ railsserver（前台），见 content/zammad/start-app.sh
-    image: registry.lazycat.cloud/wans/zammad/zammad:8bb7eb98f2854358
+    # upstream: zammad/zammad:7.2.2
+    image: registry.lazycat.cloud/wans/zammad/zammad:8c84d6d5643747e8
     # 【2026-10-13 返工 #20237】原用 run_as: 1000（idmapped 映射），重装场景会
     # 让容器创建失败（EOVERFLOW，见 elasticsearch 段注释）。改为 user: "0" 启动，
     # start-app.sh 以 root 先 chown /lzcapp/var/storage 给 zammad(1000)，

@@ -1,5 +1,5 @@
 package: cloud.lazycat.app.zammad
-version: 7.2.2-11
+version: 7.2.2
 name: Zammad 工单系统
 description: 自托管客服工单系统：把邮件、表单与在线工单集中到一个工作台，含知识库与全文检索。
 author: Zammad Foundation
@@ -14,101 +14,67 @@ locales:
     name: Zammad 工单系统
     description: 自托管客服工单系统：把邮件、表单与在线工单集中到一个工作台，含知识库、全文检索与团队协作，数据留在自己的微服上。
     usage: >
-      Zammad 是开源的客服工单系统：把客户来信、在线表单和内部协作集中到一个工作台，按队列分派、跟踪 SLA、
-      沉淀知识库。数据（工单、附件、客户资料）全部保存在自己的微服上。
+      Zammad 是开源的客服工单系统：把客户来信、在线表单和内部协作集中到一个工作台，按队列分派、跟踪 SLA、 沉淀知识库。数据（工单、附件、客户资料）全部保存在自己的微服上。
 
 
       首次使用：
 
-      1. 打开应用，Zammad 会自动完成初始化并直接以管理员身份进入（不需要输入账号密码）。
-      2. 首屏是工单总览：左侧「总览」「工单」「客户」「知识库」「报表」；右上角是个人菜单与设置。
-      3. 新建工单：左侧「工单 → 新建工单」，填标题、客户、正文，需要附件时点回形针，会弹出统一文件窗口
+      1. 打开应用，Zammad 会自动完成初始化并直接以管理员身份进入（不需要输入账号密码）。 2. 首屏是工单总览：左侧「总览」「工单」「客户」「知识库」「报表」；右上角是个人菜单与设置。 3. 新建工单：左侧「工单 → 新建工单」，填标题、客户、正文，需要附件时点回形针，会弹出统一文件窗口
+
          （可从微服网盘选文件，也可选本机文件）。
 
 
       审核专用账号（若会话过期或退出登录后需要重新登录）：
 
-      - 登录地址：应用首页，右下角「登录」或直接访问 `/#login`
-      - 账号：`admin@example.com`
-      - 密码：`LzcZammad2026!`
+      - 登录地址：应用首页，右下角「登录」或直接访问 `/#login` - 账号：`admin@example.com` - 密码：`LzcZammad2026!`
 
 
       常用操作：
 
-      - 工单分派与状态：打开一张工单，可改负责人、优先级、状态、分组，写内部备注（仅同事可见）或回复客户。
-      - 知识库：左侧「知识库」可以建分类与文章，也可以把工单内容一键转成知识库草稿。
-      - 全文检索：顶部搜索框基于 Elasticsearch，支持按工单号、标题、正文、附件名搜索。
-      - 客户与组织：左侧「客户」维护客户档案，工单会按客户归集。
+      - 工单分派与状态：打开一张工单，可改负责人、优先级、状态、分组，写内部备注（仅同事可见）或回复客户。 - 知识库：左侧「知识库」可以建分类与文章，也可以把工单内容一键转成知识库草稿。 - 全文检索：顶部搜索框基于 Elasticsearch，支持按工单号、标题、正文、附件名搜索。 - 客户与组织：左侧「客户」维护客户档案，工单会按客户归集。
 
 
       文件：
 
-      - 上传/导入：工单附件、知识库图片都会弹出统一的文件窗口，可从微服网盘选，也可选本机文件。
-      - 下载/导出：附件下载同样走这个窗口，可以保存到网盘目录或下载到本机。
-      - 建议单次上传不超过 500 MB（应用内 nginx 上限 512 MB）。
+      - 上传/导入：工单附件、知识库图片都会弹出统一的文件窗口，可从微服网盘选，也可选本机文件。 - 下载/导出：附件下载同样走这个窗口，可以保存到网盘目录或下载到本机。 - 建议单次上传不超过 500 MB（应用内 nginx 上限 512 MB）。
 
 
       说明与限制：
 
-      - 首次启动需要初始化数据库与索引，约 2–3 分钟，期间客户端显示「启动中」。
-      - 数据持久化：PostgreSQL、Elasticsearch 索引与附件都保存在应用数据目录，重启与升级不丢。
-      - 邮件收发需要你自己提供邮箱账号（IMAP/SMTP）并在「通道」里配置；不配置时系统不会对外发信，
+      - 首次启动需要初始化数据库与索引，约 2–3 分钟，期间客户端显示「启动中」。 - 数据持久化：PostgreSQL、Elasticsearch 索引与附件都保存在应用数据目录，重启与升级不丢。 - 邮件收发需要你自己提供邮箱账号（IMAP/SMTP）并在「通道」里配置；不配置时系统不会对外发信，
+
         工单仍可用网页端处理。这是上游设计，非本移植限制。
       - 界面语言跟随浏览器，中文环境默认显示简体中文（系统默认语言已设为简体中文）。
+
   en-US:
     name: Zammad Helpdesk
     description: >-
-      Self-hosted helpdesk: incoming email, web forms and internal tickets in one
-      workspace, with knowledge base and full-text search, all on your own box.
+      Self-hosted helpdesk: incoming email, web forms and internal tickets in one workspace, with knowledge base and full-text search, all on your own box.
     usage: >
-      Zammad is an open source helpdesk: collect customer email, web forms and
-      internal collaboration in one workspace, dispatch tickets, track SLAs and
-      build a knowledge base. Tickets, attachments and customer data stay on your box.
+      Zammad is an open source helpdesk: collect customer email, web forms and internal collaboration in one workspace, dispatch tickets, track SLAs and build a knowledge base. Tickets, attachments and customer data stay on your box.
 
 
       Getting started:
 
-      1. Open the app. Zammad finishes its initial setup automatically and logs you
-      in as the administrator — no credentials to type.
-      2. The first screen is the ticket overview, with Tickets, Customers,
-      Knowledge Base and Reports in the sidebar.
-      3. Create a ticket from Tickets → New Ticket. Use the paperclip to attach
-      files; the unified file dialog lets you pick a file from the box network
-      drive or from your computer.
+      1. Open the app. Zammad finishes its initial setup automatically and logs you in as the administrator — no credentials to type. 2. The first screen is the ticket overview, with Tickets, Customers, Knowledge Base and Reports in the sidebar. 3. Create a ticket from Tickets → New Ticket. Use the paperclip to attach files; the unified file dialog lets you pick a file from the box network drive or from your computer.
 
 
       Review credentials (only needed if the session expired or you signed out):
 
-      - Login page: app home page → "Login", or `/#login`
-      - User: `admin@example.com`
-      - Password: `LzcZammad2026!`
+      - Login page: app home page → "Login", or `/#login` - User: `admin@example.com` - Password: `LzcZammad2026!`
 
 
       Common tasks:
 
-      - Dispatch and status: assign owner, priority, state and group; write internal
-      notes or reply to the customer.
-      - Knowledge base: create categories and articles, or turn a ticket into a draft.
-      - Full-text search: the top search box is backed by Elasticsearch.
-      - Customers and organizations: keep customer records; tickets are grouped by customer.
+      - Dispatch and status: assign owner, priority, state and group; write internal notes or reply to the customer. - Knowledge base: create categories and articles, or turn a ticket into a draft. - Full-text search: the top search box is backed by Elasticsearch. - Customers and organizations: keep customer records; tickets are grouped by customer.
 
 
       Files:
 
-      - Uploads (ticket attachments, knowledge base images) open the unified dialog
-      for network drive files or local files.
-      - Downloads (attachments) use the same dialog, so files can be saved to the
-      network drive.
-      - Keep single uploads under 500 MB (in-app nginx limit is 512 MB).
+      - Uploads (ticket attachments, knowledge base images) open the unified dialog for network drive files or local files. - Downloads (attachments) use the same dialog, so files can be saved to the network drive. - Keep single uploads under 500 MB (in-app nginx limit is 512 MB).
 
 
       Notes and limits:
 
-      - The first start initialises the database and search index; it takes about
-      2–3 minutes, during which the client shows "starting".
-      - Persistence: PostgreSQL, the Elasticsearch index and attachments live in the
-      app data directory and survive restarts and upgrades.
-      - Email channels need your own IMAP/SMTP account (configured under Channels).
-      Without it the app does not send mail, but tickets can still be handled in the
-      web UI. That is upstream behaviour, not a packaging limitation.
-      - The UI follows the browser language; Simplified Chinese is the system default.
+      - The first start initialises the database and search index; it takes about 2–3 minutes, during which the client shows "starting". - Persistence: PostgreSQL, the Elasticsearch index and attachments live in the app data directory and survive restarts and upgrades. - Email channels need your own IMAP/SMTP account (configured under Channels). Without it the app does not send mail, but tickets can still be handled in the web UI. That is upstream behaviour, not a packaging limitation. - The UI follows the browser language; Simplified Chinese is the system default.
+
